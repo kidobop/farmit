@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "899183477660",
+    "project_id": "farmit-e496d",
+    "storage_bucket": "farmit-e496d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899183477660:android:cd36d9029ad9e63c5f7e59",
+        "android_client_info": {
+          "package_name": "com.example.majorproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFi8_izO09T4SXjIDBE6SOwQXtxv6pSnQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
