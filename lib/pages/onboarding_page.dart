@@ -22,7 +22,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
         _isLoading = true;
       });
       try {
-        // Store user data in Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(widget.uid)
@@ -38,7 +37,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to save data: $e")),
+            SnackBar(
+              content: Text("Failed to save data: $e"),
+              backgroundColor: Colors.red.shade400,
+            ),
           );
         }
       } finally {
@@ -54,67 +56,144 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Complete Your Profile")),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Tell us about yourself",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: "Full Name"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter your name" : null,
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _locationController,
-                  decoration: const InputDecoration(
-                      labelText: "Location (e.g., City, State)"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter your location" : null,
-                ),
-                const SizedBox(height: 20),
-                const Text("Are you a:", style: TextStyle(fontSize: 16)),
-                RadioListTile<String>(
-                  title: const Text("Farmer"),
-                  value: "Farmer",
-                  groupValue: _role,
-                  onChanged: (value) {
-                    setState(() {
-                      _role = value!;
-                    });
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text("Buyer"),
-                  value: "Buyer",
-                  groupValue: _role,
-                  onChanged: (value) {
-                    setState(() {
-                      _role = value!;
-                    });
-                  },
-                ),
-                const SizedBox(height: 20),
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton(
-                        onPressed: _submitOnboarding,
-                        child: const Text("Continue"),
-                      ),
-              ],
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with modern typography
+                  Text(
+                    "Complete Your Profile",
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Help us personalize your experience",
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.black54,
+                        ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Name Input with Material 3 style
+                  _buildTextField(
+                    controller: _nameController,
+                    label: "Full Name",
+                    icon: Icons.person_outline,
+                    validator: (value) =>
+                        value!.isEmpty ? "Please enter your name" : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Location Input with Material 3 style
+                  _buildTextField(
+                    controller: _locationController,
+                    label: "Location",
+                    icon: Icons.location_on_outlined,
+                    validator: (value) =>
+                        value!.isEmpty ? "Please enter your location" : null,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Role Selection with a more modern design
+                  Text(
+                    "Select Your Role",
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildRoleChip("Farmer", _role == "Farmer"),
+                      const SizedBox(width: 12),
+                      _buildRoleChip("Buyer", _role == "Buyer"),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Submit Button with loading state
+                  SizedBox(
+                    width: double.infinity,
+                    child: _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator.adaptive())
+                        : FilledButton(
+                            onPressed: _submitOnboarding,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              "Continue",
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Custom text field with icon and Material 3 style
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: Colors.grey.shade600),
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.blue.shade500, width: 2),
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
+  // Modern role selection chip
+  Widget _buildRoleChip(String role, bool isSelected) {
+    return ChoiceChip(
+      label: Text(role),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() {
+          _role = role;
+        });
+      },
+      selectedColor: Colors.blue.shade100,
+      backgroundColor: Colors.grey.shade100,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.blue.shade800 : Colors.black54,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
     );
   }

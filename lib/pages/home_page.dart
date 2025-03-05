@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:farmit/pages/market_place.dart'; // Import MarketplacePage
 import 'package:farmit/pages/profile.dart'; // Import ProfilePage
 import 'package:farmit/pages/tools_page.dart'; // Import ToolsPage
@@ -95,193 +97,220 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// HomeContent remains unchanged
 class HomeContent extends StatelessWidget {
   const HomeContent({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFBF9F9),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(25.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Scaffold(body: Center(child: Text("Not logged in")));
+    }
+
+    return FutureBuilder<DocumentSnapshot>(
+      future:
+          FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return const Scaffold(
+              body: Center(child: Text("Error loading user data")));
+        }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Scaffold(
+              body: Center(child: Text("User data not found")));
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final name =
+            data['name'] ?? "User"; // Fallback to "User" if name is missing
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFFBF9F9),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(25.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          "Hi, User!",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Hi, $name!",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Text(
+                              "21 Jan 2025",
+                              style: TextStyle(color: Colors.green),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(12),
+                          child: const Icon(
+                            Icons.notifications,
+                            color: Colors.white,
+                            size: 30,
                           ),
                         ),
-                        Text(
-                          "21 Jan 2025",
-                          style: TextStyle(color: Colors.green),
-                        )
                       ],
                     ),
+                    const SizedBox(height: 25),
                     Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          colors: [Colors.blue[400]!, Colors.blue[600]!],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      padding: const EdgeInsets.all(12),
-                      child: const Icon(
-                        Icons.notifications,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    )
-                  ],
-                ),
-                const SizedBox(height: 25),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue[400]!, Colors.blue[600]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            "Today's Weather",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                "Today's Weather",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                "28°C",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                "Partly Cloudy",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            "28°C",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "Partly Cloudy",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
+                          const Icon(
+                            Icons.cloud,
+                            color: Colors.white,
+                            size: 64,
                           ),
                         ],
                       ),
-                      const Icon(
-                        Icons.cloud,
-                        color: Colors.white,
-                        size: 64,
+                    ),
+                    const SizedBox(height: 25),
+                    const Text(
+                      "Quick Actions",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 25),
-                const Text(
-                  "Quick Actions",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildQuickActionCard(
-                      "Scan Plant",
-                      Icons.camera_alt,
-                      Colors.green[100]!,
-                      Colors.green,
                     ),
-                    _buildQuickActionCard(
-                      "Market Price",
-                      Icons.trending_up,
-                      Colors.orange[100]!,
-                      Colors.orange,
+                    const SizedBox(height: 15),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildQuickActionCard(
+                          "Scan Plant",
+                          Icons.camera_alt,
+                          Colors.green[100]!,
+                          Colors.green,
+                        ),
+                        _buildQuickActionCard(
+                          "Market Price",
+                          Icons.trending_up,
+                          Colors.orange[100]!,
+                          Colors.orange,
+                        ),
+                        _buildQuickActionCard(
+                          "My Crops",
+                          Icons.grass,
+                          Colors.blue[100]!,
+                          Colors.blue,
+                        ),
+                      ],
                     ),
-                    _buildQuickActionCard(
-                      "My Crops",
-                      Icons.grass,
-                      Colors.blue[100]!,
-                      Colors.blue,
+                    const SizedBox(height: 25),
+                    const Text(
+                      "Today's Market Prices",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    _buildMarketPriceCard("Rice", "₹3,500/quintal", "+2.3%"),
+                    const SizedBox(height: 10),
+                    _buildMarketPriceCard("Wheat", "₹2,800/quintal", "-1.2%"),
+                    const SizedBox(height: 10),
+                    _buildMarketPriceCard("Cotton", "₹6,200/quintal", "+3.1%"),
+                    const SizedBox(height: 25),
+                    const Text(
+                      "Farming Tips",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildTipCard(
+                            "Best time to sow wheat is approaching",
+                            "2 hours ago",
+                          ),
+                          const Divider(),
+                          _buildTipCard(
+                            "Protect your crops from upcoming rain",
+                            "5 hours ago",
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 25),
-                const Text(
-                  "Today's Market Prices",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                _buildMarketPriceCard("Rice", "₹3,500/quintal", "+2.3%"),
-                const SizedBox(height: 10),
-                _buildMarketPriceCard("Wheat", "₹2,800/quintal", "-1.2%"),
-                const SizedBox(height: 10),
-                _buildMarketPriceCard("Cotton", "₹6,200/quintal", "+3.1%"),
-                const SizedBox(height: 25),
-                const Text(
-                  "Farming Tips",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      _buildTipCard(
-                        "Best time to sow wheat is approaching",
-                        "2 hours ago",
-                      ),
-                      const Divider(),
-                      _buildTipCard(
-                        "Protect your crops from upcoming rain",
-                        "5 hours ago",
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
