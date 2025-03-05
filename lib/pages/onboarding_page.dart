@@ -24,7 +24,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
         _isLoading = true;
       });
       try {
-        await FirebaseFirestore.instance.collection('users').doc(widget.uid).set({
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.uid)
+            .set({
           'name': _nameController.text.trim(),
           'location': _locationController.text.trim(),
           'role': _role,
@@ -92,7 +95,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
             children: [
               // Progress Indicator
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Row(
                   children: List.generate(3, (index) {
                     return Expanded(
