@@ -11,9 +11,13 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isLogin = true; // Toggle between login and signup
+  bool _isLogin = true;
+  bool _isLoading = false;
 
   Future<void> _authenticate() async {
+    setState(() {
+      _isLoading = true;
+    });
     try {
       if (_isLogin) {
         // Login
@@ -21,22 +25,33 @@ class _LoginPageState extends State<LoginPage> {
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
       } else {
         // Signup
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        UserCredential userCredential =
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-      }
-      // After successful authentication, navigate to HomePage
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        if (mounted) {
+          // Redirect to onboarding after signup
+          Navigator.of(context).pushReplacementNamed('/onboarding',
+              arguments: userCredential.user!.uid);
+        }
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message ?? "An error occurred")),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -61,14 +76,16 @@ class _LoginPageState extends State<LoginPage> {
               decoration: const InputDecoration(labelText: "Password"),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _authenticate,
-              child: Text(_isLogin ? "Login" : "Sign Up"),
-            ),
+            _isLoading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _authenticate,
+                    child: Text(_isLogin ? "Login" : "Sign Up"),
+                  ),
             TextButton(
               onPressed: () {
                 setState(() {
-                  _isLogin = !_isLogin; // Toggle between login and signup
+                  _isLogin = !_isLogin;
                 });
               },
               child: Text(_isLogin

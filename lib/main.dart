@@ -7,6 +7,7 @@ import 'pages/login_page.dart';
 import 'pages/market_place.dart';
 import 'pages/profile.dart';
 import 'pages/tools_page.dart';
+import 'pages/onboarding_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,11 +27,16 @@ class MyApp extends StatelessWidget {
       initialRoute: '/auth',
       routes: {
         '/auth': (context) => const AuthWrapper(),
-        '/home': (context) => const HomePage(initialIndex: 0), // Home tab
+        '/home': (context) => const HomePage(initialIndex: 0),
         '/login': (context) => const LoginPage(),
-        '/market': (context) => const HomePage(initialIndex: 1), // Market tab
-        '/tools': (context) => const HomePage(initialIndex: 2), // Tools tab
-        '/profile': (context) => const HomePage(initialIndex: 3), // Profile tab
+        '/market': (context) => const HomePage(initialIndex: 1),
+        '/tools': (context) => const HomePage(initialIndex: 2),
+        '/profile': (context) => const HomePage(initialIndex: 3),
+        '/onboarding': (context) {
+          final String uid =
+              ModalRoute.of(context)!.settings.arguments as String;
+          return OnboardingPage(uid: uid);
+        },
       },
     );
   }
