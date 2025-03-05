@@ -10,11 +10,13 @@ class OnboardingPage extends StatefulWidget {
 }
 
 class _OnboardingPageState extends State<OnboardingPage> {
+  final PageController _pageController = PageController();
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   String _role = 'Farmer'; // Default role
   bool _isLoading = false;
+  int _currentPage = 0;
 
   Future<void> _submitOnboarding() async {
     if (_formKey.currentState!.validate()) {
@@ -22,15 +24,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
         _isLoading = true;
       });
       try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.uid)
-            .set({
+        await FirebaseFirestore.instance.collection('users').doc(widget.uid).set({
           'name': _nameController.text.trim(),
           'location': _locationController.text.trim(),
           'role': _role,
           'createdAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
         if (mounted) {
           Navigator.of(context).pushReplacementNamed('/home');
         }
@@ -50,6 +49,35 @@ class _OnboardingPageState extends State<OnboardingPage> {
           });
         }
       }
+    } else {
+      // Show feedback if validation fails
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill in all required fields"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _nextPage() {
+    if (_currentPage < 2) {
+      // Validate the current page's fields before proceeding
+      if (_formKey.currentState!.validate()) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please fill in the required field"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      _submitOnboarding();
     }
   }
 
@@ -58,91 +86,224 @@ class _OnboardingPageState extends State<OnboardingPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header with modern typography
-                  Text(
-                    "Complete Your Profile",
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
+        child: Form(
+          key: _formKey, // Wrap the entire PageView in a Form
+          child: Column(
+            children: [
+              // Progress Indicator
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: Row(
+                  children: List.generate(3, (index) {
+                    return Expanded(
+                      child: Container(
+                        height: 4,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: index <= _currentPage
+                              ? Colors.blue.shade500
+                              : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    "Help us personalize your experience",
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.black54,
-                        ),
-                  ),
-                  const SizedBox(height: 32),
+                      ),
+                    );
+                  }),
+                ),
+              ),
 
-                  // Name Input with Material 3 style
-                  _buildTextField(
-                    controller: _nameController,
-                    label: "Full Name",
-                    icon: Icons.person_outline,
-                    validator: (value) =>
-                        value!.isEmpty ? "Please enter your name" : null,
-                  ),
-                  const SizedBox(height: 16),
+              // Page View
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  children: [
+                    // Name Page
+                    _buildNamePage(),
 
-                  // Location Input with Material 3 style
-                  _buildTextField(
-                    controller: _locationController,
-                    label: "Location",
-                    icon: Icons.location_on_outlined,
-                    validator: (value) =>
-                        value!.isEmpty ? "Please enter your location" : null,
-                  ),
-                  const SizedBox(height: 24),
+                    // Location Page
+                    _buildLocationPage(),
 
-                  // Role Selection with a more modern design
-                  Text(
-                    "Select Your Role",
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _buildRoleChip("Farmer", _role == "Farmer"),
-                      const SizedBox(width: 12),
-                      _buildRoleChip("Buyer", _role == "Buyer"),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
+                    // Role Page
+                    _buildRolePage(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-                  // Submit Button with loading state
-                  SizedBox(
-                    width: double.infinity,
-                    child: _isLoading
-                        ? const Center(
-                            child: CircularProgressIndicator.adaptive())
-                        : FilledButton(
-                            onPressed: _submitOnboarding,
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              "Continue",
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          ),
-                  ),
-                ],
+  // Name Input Page
+  Widget _buildNamePage() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "What's Your Name?",
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "Help us personalize your experience",
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.black54,
+                ),
+          ),
+          const SizedBox(height: 32),
+
+          // Name Input
+          _buildTextField(
+            controller: _nameController,
+            label: "Full Name",
+            icon: Icons.person_outline,
+            validator: (value) =>
+                value!.trim().isEmpty ? "Please enter your name" : null,
+          ),
+          const Spacer(),
+
+          // Next Button
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _nextPage,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                "Next",
+                style: TextStyle(fontSize: 16),
               ),
             ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  // Location Input Page
+  Widget _buildLocationPage() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Where Are You Located?",
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "This helps us provide localized recommendations",
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.black54,
+                ),
+          ),
+          const SizedBox(height: 32),
+
+          // Location Input
+          _buildTextField(
+            controller: _locationController,
+            label: "Location",
+            icon: Icons.location_on_outlined,
+            validator: (value) =>
+                value!.trim().isEmpty ? "Please enter your location" : null,
+          ),
+          const Spacer(),
+
+          // Next Button
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _nextPage,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                "Next",
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Role Selection Page
+  Widget _buildRolePage() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Select Your Role",
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "Choose how you'll use our platform",
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.black54,
+                ),
+          ),
+          const SizedBox(height: 32),
+
+          // Role Selection
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildRoleChip("Farmer", _role == "Farmer"),
+              const SizedBox(width: 12),
+              _buildRoleChip("Buyer", _role == "Buyer"),
+            ],
+          ),
+          const Spacer(),
+
+          // Submit Button
+          SizedBox(
+            width: double.infinity,
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator.adaptive())
+                : FilledButton(
+                    onPressed: _submitOnboarding,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "Complete",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -202,6 +363,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   void dispose() {
     _nameController.dispose();
     _locationController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 }
