@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart'; // Use image_picker instead of file_picker
 import 'package:cached_network_image/cached_network_image.dart';
-
 import 'package:cloudinary_public/cloudinary_public.dart'; // For Cloudinary uploads
+import 'listing_details_page.dart'; // Import the new details page
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
@@ -40,7 +40,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
   @override
   void initState() {
     super.initState();
-    // Initialize Cloudinary with credentials from .env
+    // Initialize Cloudinary with credentials (replace with your values)
     final cloudName = "dsbskddgj";
     final uploadPreset = "farmit_upload";
     _cloudinary = CloudinaryPublic(cloudName, uploadPreset, cache: false);
@@ -84,7 +84,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
     try {
       final response = await _cloudinary.uploadFile(
         CloudinaryFile.fromFile(
-          image.path, // Works on mobile; web uses path differently
+          image.path,
           resourceType: CloudinaryResourceType.Image,
         ),
       );
@@ -154,8 +154,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                     color: Colors.grey[200],
                     child: _selectedImage != null
                         ? Image.network(
-                            _selectedImage!
-                                .path, // For web, path is a URL; for mobile, use Image.file
+                            _selectedImage!.path,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 const Icon(Icons.error),
@@ -574,7 +573,28 @@ class _MarketplacePageState extends State<MarketplacePage> {
     String? imageUrl,
   ) {
     return GestureDetector(
-      onTap: () => _showListingForm(listingId: listingId),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ListingDetailsPage(
+              title: title,
+              description: description,
+              price: price,
+              quantity: quantity,
+              location:
+                  'Texas', // Replace with actual location from data if available
+              phoneNumber:
+                  '123-456-7890', // Replace with actual phone from data if available
+              category:
+                  'Grains', // Replace with actual category from data if available
+              isSold:
+                  false, // Replace with actual isSold from data if available
+              imageUrl: imageUrl,
+            ),
+          ),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(

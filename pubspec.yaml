@@ -42,6 +42,7 @@ dependencies:
   cloudinary_public: ^0.23.1
   http: ^1.2.1
   cached_network_image: ^3.3.1
+  url_launcher:
 
 dev_dependencies:
   flutter_test:
