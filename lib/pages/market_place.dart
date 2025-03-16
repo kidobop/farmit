@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart'; // Use image_picker instead of file_picker
+import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloudinary_public/cloudinary_public.dart'; // For Cloudinary uploads
-import 'listing_details_page.dart'; // Import the new details page
+import 'package:cloudinary_public/cloudinary_public.dart';
+import 'listing_details_page.dart';
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
@@ -29,18 +29,16 @@ class _MarketplacePageState extends State<MarketplacePage> {
   final _phoneController = TextEditingController();
   String _category = "Grains";
   bool _isSold = false;
-  String? _listingId; // For editing existing listings
-  XFile? _selectedImage; // Use XFile instead of File for web compatibility
-  String? _imageUrl; // To store the Cloudinary URL
-  bool _isUploading = false; // To show loading state during upload
+  String? _listingId;
+  XFile? _selectedImage;
+  String? _imageUrl;
+  bool _isUploading = false;
 
-  // Initialize Cloudinary
   late CloudinaryPublic _cloudinary;
 
   @override
   void initState() {
     super.initState();
-    // Initialize Cloudinary with credentials (replace with your values)
     final cloudName = "dsbskddgj";
     final uploadPreset = "farmit_upload";
     _cloudinary = CloudinaryPublic(cloudName, uploadPreset, cache: false);
@@ -58,7 +56,6 @@ class _MarketplacePageState extends State<MarketplacePage> {
     super.dispose();
   }
 
-  // Pick an image using image_picker
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
@@ -75,7 +72,6 @@ class _MarketplacePageState extends State<MarketplacePage> {
     }
   }
 
-  // Upload image to Cloudinary and return the URL
   Future<String?> _uploadImageToCloudinary(XFile image) async {
     setState(() {
       _isUploading = true;
@@ -101,10 +97,8 @@ class _MarketplacePageState extends State<MarketplacePage> {
     }
   }
 
-  // Show dialog to add or edit a listing
   void _showListingForm({String? listingId}) async {
     if (listingId != null) {
-      // Fetch existing listing data for editing
       final doc = await _firestore.collection('listings').doc(listingId).get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -116,12 +110,11 @@ class _MarketplacePageState extends State<MarketplacePage> {
         _phoneController.text = data['phoneNumber'] ?? '';
         _category = data['category'] ?? 'Grains';
         _isSold = data['isSold'] ?? false;
-        _imageUrl = data['imageUrl']; // Load existing image URL
+        _imageUrl = data['imageUrl'];
         _listingId = listingId;
-        _selectedImage = null; // Reset selected image
+        _selectedImage = null;
       }
     } else {
-      // Reset form for new listing
       _titleController.clear();
       _descriptionController.clear();
       _priceController.clear();
@@ -145,7 +138,6 @@ class _MarketplacePageState extends State<MarketplacePage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Image picker
                 GestureDetector(
                   onTap: _pickImage,
                   child: Container(
@@ -257,7 +249,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                 String? newImageUrl = _imageUrl;
                 if (_selectedImage != null) {
                   newImageUrl = await _uploadImageToCloudinary(_selectedImage!);
-                  if (newImageUrl == null) return; // Stop if upload fails
+                  if (newImageUrl == null) return;
                 }
 
                 final userId = _auth.currentUser!.uid;
@@ -284,7 +276,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                       .update(data);
                 }
                 Navigator.pop(context);
-                setState(() {}); // Refresh the page
+                setState(() {});
               }
             },
             child: Text(_listingId == null ? "Add" : "Save"),
@@ -305,7 +297,6 @@ class _MarketplacePageState extends State<MarketplacePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Search Bar
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 15),
                   decoration: BoxDecoration(
@@ -331,10 +322,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                     },
                   ),
                 ),
-
                 const SizedBox(height: 25),
-
-                // Market Overview
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -368,10 +356,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 25),
-
-                // Categories
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -388,10 +373,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 25),
-
-                // Top Listings
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: const [
@@ -411,15 +393,13 @@ class _MarketplacePageState extends State<MarketplacePage> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 15),
-
-                // Dynamic Listing Cards
                 StreamBuilder<QuerySnapshot>(
                   stream: _firestore
                       .collection('listings')
-                      .where('userId', isEqualTo: _auth.currentUser!.uid)
-                      .snapshots(),
+                      .orderBy('createdAt',
+                          descending: true) // Sort by createdAt, newest first
+                      .snapshots(), // Removed userId filter to show all listings
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -459,6 +439,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                               isPositive,
                               doc.id,
                               data['imageUrl'],
+                              data,
                             ),
                             const SizedBox(height: 15),
                           ],
@@ -467,10 +448,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
                     );
                   },
                 ),
-
                 const SizedBox(height: 25),
-
-                // Market Trends (Static for now)
                 const Text(
                   "Market Trends",
                   style: TextStyle(
@@ -571,6 +549,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
     bool isPositive,
     String listingId,
     String? imageUrl,
+    Map<String, dynamic> data,
   ) {
     return GestureDetector(
       onTap: () {
@@ -582,15 +561,14 @@ class _MarketplacePageState extends State<MarketplacePage> {
               description: description,
               price: price,
               quantity: quantity,
-              location:
-                  'Texas', // Replace with actual location from data if available
-              phoneNumber:
-                  '123-456-7890', // Replace with actual phone from data if available
-              category:
-                  'Grains', // Replace with actual category from data if available
-              isSold:
-                  false, // Replace with actual isSold from data if available
+              location: data['location'] ?? 'N/A',
+              phoneNumber: data['phoneNumber'] ?? 'N/A',
+              category: data['category'] ?? 'N/A',
+              isSold: data['isSold'] ?? false,
               imageUrl: imageUrl,
+              listingId: listingId,
+              userId: data['userId'] ?? '',
+              onEdit: () => _showListingForm(listingId: listingId),
             ),
           ),
         );
