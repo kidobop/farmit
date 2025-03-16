@@ -74,6 +74,8 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
   - .env
+  - assets/models/plant_disease_model.tflite  # Path to your TFLite model
+  - assets/models/plant_labels.txt
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

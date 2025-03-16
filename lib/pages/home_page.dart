@@ -53,8 +53,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
-        margin: const EdgeInsets.symmetric(
-            horizontal: 20, vertical: 10), // Reduced vertical margin
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
@@ -78,13 +77,21 @@ class _HomePageState extends State<HomePage> {
             selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
             items: const [
               BottomNavigationBarItem(
-                  icon: Icon(Icons.home_rounded), label: 'Home'),
+                icon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
               BottomNavigationBarItem(
-                  icon: Icon(Icons.shopping_bag_rounded), label: 'Market'),
+                icon: Icon(Icons.shopping_bag_rounded),
+                label: 'Market',
+              ),
               BottomNavigationBarItem(
-                  icon: Icon(Icons.agriculture_rounded), label: 'Tools'),
+                icon: Icon(Icons.agriculture_rounded),
+                label: 'Tools',
+              ),
               BottomNavigationBarItem(
-                  icon: Icon(Icons.person_rounded), label: 'Profile'),
+                icon: Icon(Icons.person_rounded),
+                label: 'Profile',
+              ),
             ],
           ),
         ),
@@ -151,7 +158,9 @@ class _HomeContentState extends State<HomeContent> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const Scaffold(body: Center(child: Text("Not logged in")));
+      return const Scaffold(
+        body: Center(child: Text("Not logged in")),
+      );
     }
 
     return Container(
@@ -167,11 +176,10 @@ class _HomeContentState extends State<HomeContent> {
         body: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.all(16.0), // Reduced padding slightly
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -189,20 +197,24 @@ class _HomeContentState extends State<HomeContent> {
                           Text(
                             "March 16, 2025",
                             style: TextStyle(
-                                color: Colors.teal.shade600, fontSize: 16),
+                              color: Colors.teal.shade600,
+                              fontSize: 16,
+                            ),
                           ),
                         ],
                       ),
                       CircleAvatar(
                         radius: 25,
                         backgroundColor: Colors.teal.shade700,
-                        child: Icon(Icons.notifications,
-                            color: Colors.white, size: 28),
+                        child: Icon(
+                          Icons.notifications,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20), // Reduced spacing
-                  // Weather Card
+                  const SizedBox(height: 20),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     padding: const EdgeInsets.all(20),
@@ -223,13 +235,17 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     child: _isLoadingWeather
                         ? const Center(
-                            child:
-                                CircularProgressIndicator(color: Colors.white))
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                          )
                         : _weatherError != null
                             ? Center(
-                                child: Text(_weatherError!,
-                                    style:
-                                        const TextStyle(color: Colors.white)))
+                                child: Text(
+                                  _weatherError!,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              )
                             : Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -241,8 +257,9 @@ class _HomeContentState extends State<HomeContent> {
                                       const Text(
                                         "Today's Weather",
                                         style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 16),
+                                          color: Colors.white70,
+                                          fontSize: 16,
+                                        ),
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
@@ -258,8 +275,9 @@ class _HomeContentState extends State<HomeContent> {
                                             .toString()
                                             .capitalize(),
                                         style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 16),
+                                          color: Colors.white70,
+                                          fontSize: 16,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -280,13 +298,15 @@ class _HomeContentState extends State<HomeContent> {
                                 ],
                               ),
                   ),
-                  const SizedBox(height: 20), // Reduced spacing
-                  // Quick Actions (Adjusted height)
+                  const SizedBox(height: 20),
                   const Text(
                     "Quick Actions",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  const SizedBox(height: 10), // Reduced spacing
+                  const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -295,7 +315,9 @@ class _HomeContentState extends State<HomeContent> {
                         Icons.camera_alt,
                         Colors.green,
                         () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Feature coming soon!')),
+                          const SnackBar(
+                            content: Text('Feature coming soon!'),
+                          ),
                         ),
                       ),
                       _buildQuickActionCard(
@@ -305,7 +327,8 @@ class _HomeContentState extends State<HomeContent> {
                         () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const MarketPricesPage()),
+                            builder: (_) => const MarketPricesPage(),
+                          ),
                         ),
                       ),
                       _buildQuickActionCard(
@@ -313,28 +336,36 @@ class _HomeContentState extends State<HomeContent> {
                         Icons.grass,
                         Colors.blue,
                         () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Feature coming soon!')),
+                          const SnackBar(
+                            content: Text('Feature coming soon!'),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20), // Reduced spacing
-                  // Market Prices
-                  const Text("Today's Market Prices",
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10), // Reduced spacing
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Today's Market Prices",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   _buildMarketPriceCard("Rice", "₹3,500/quintal", "+2.3%"),
-                  const SizedBox(height: 8), // Reduced spacing
+                  const SizedBox(height: 8),
                   _buildMarketPriceCard("Wheat", "₹2,800/quintal", "-1.2%"),
-                  const SizedBox(height: 8), // Reduced spacing
+                  const SizedBox(height: 8),
                   _buildMarketPriceCard("Cotton", "₹6,200/quintal", "+3.1%"),
-                  const SizedBox(height: 20), // Reduced spacing
-                  // Farming Tips
-                  const Text("Farming Tips",
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10), // Reduced spacing
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Farming Tips",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
@@ -342,18 +373,23 @@ class _HomeContentState extends State<HomeContent> {
                       borderRadius: BorderRadius.circular(15),
                       boxShadow: [
                         BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5)),
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
                       ],
                     ),
                     child: Column(
                       children: [
-                        _buildTipCard("Best time to sow wheat is approaching",
-                            "2 hours ago"),
+                        _buildTipCard(
+                          "Best time to sow wheat is approaching",
+                          "2 hours ago",
+                        ),
                         const Divider(),
-                        _buildTipCard("Protect your crops from upcoming rain",
-                            "5 hours ago"),
+                        _buildTipCard(
+                          "Protect your crops from upcoming rain",
+                          "5 hours ago",
+                        ),
                       ],
                     ),
                   ),
@@ -366,16 +402,15 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // Updated Quick Action Card with reduced height
   Widget _buildQuickActionCard(
       String title, IconData icon, Color color, VoidCallback? onTap) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        width: 110, // Fixed width
-        height: 90, // Reduced height to prevent overflow
-        padding: const EdgeInsets.all(12), // Reduced padding
+        width: 110,
+        height: 90,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
@@ -394,13 +429,13 @@ class _HomeContentState extends State<HomeContent> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 30), // Slightly reduced icon size
-            const SizedBox(height: 6), // Reduced spacing
+            Icon(icon, color: color, size: 30),
+            const SizedBox(height: 6),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13, // Slightly reduced font size
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: Colors.grey.shade800,
               ),
@@ -423,29 +458,39 @@ class _HomeContentState extends State<HomeContent> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 5))
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(crop,
-              style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal)),
+          Text(
+            crop,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.teal,
+            ),
+          ),
           Row(
             children: [
-              Text(price,
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800)),
+              Text(
+                price,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: isPositive
                       ? Colors.green.withOpacity(0.1)
@@ -477,20 +522,32 @@ class _HomeContentState extends State<HomeContent> {
           CircleAvatar(
             radius: 20,
             backgroundColor: Colors.teal.shade100,
-            child: Icon(Icons.lightbulb, color: Colors.teal.shade700, size: 20),
+            child: Icon(
+              Icons.lightbulb,
+              color: Colors.teal.shade700,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tip,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w500)),
+                Text(
+                  tip,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(time,
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
               ],
             ),
           ),

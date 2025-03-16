@@ -281,11 +281,24 @@ class ProfilePage extends StatelessWidget {
                             ),
                             child: TabBar(
                               indicator: BoxDecoration(
-                                color: Colors.green,
+                                color: Colors
+                                    .green, // Selected tab background color
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              labelColor: Colors.white,
-                              unselectedLabelColor: Colors.grey[700],
+                              indicatorSize: TabBarIndicatorSize
+                                  .tab, // Ensures indicator matches tab size
+                              labelColor:
+                                  Colors.white, // Text color for selected tab
+                              unselectedLabelColor: Colors
+                                  .grey[700], // Text color for unselected tab
+                              labelStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                              unselectedLabelStyle: const TextStyle(
+                                fontWeight: FontWeight.normal,
+                                fontSize: 16,
+                              ),
                               tabs: const [
                                 Tab(text: "Marketplace"),
                                 Tab(text: "Tools"),
