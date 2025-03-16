@@ -14,12 +14,60 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
+  String? _selectedState; // State selection
   String _role = 'Farmer'; // Default role
   bool _isLoading = false;
   int _currentPage = 0;
 
+  // List of states (same as in MarketPricesPage)
+  final List<String> _states = [
+    'Andaman and Nicobar',
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chandigarh',
+    'Chattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jammu and Kashmir',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'NCT of Delhi',
+    'Nagaland',
+    'Odisha',
+    'Pondicherry',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttrakhand',
+    'West Bengal',
+  ];
+
   Future<void> _submitOnboarding() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedState == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please select your state"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _isLoading = true;
       });
@@ -30,6 +78,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             .set({
           'name': _nameController.text.trim(),
           'location': _locationController.text.trim(),
+          'state': _selectedState, // Add state to Firestore
           'role': _role,
           'createdAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
@@ -64,9 +113,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   void _nextPage() {
-    if (_currentPage < 2) {
+    if (_currentPage < 3) {
+      // Updated to 3 pages (added State page)
       // Validate the current page's fields before proceeding
       if (_formKey.currentState!.validate()) {
+        // Additional validation for the state page
+        if (_currentPage == 2 && _selectedState == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Please select your state"),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
         _pageController.nextPage(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
@@ -98,7 +158,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Row(
-                  children: List.generate(3, (index) {
+                  children: List.generate(4, (index) {
+                    // Updated to 4 pages
                     return Expanded(
                       child: Container(
                         height: 4,
@@ -131,6 +192,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
                     // Location Page
                     _buildLocationPage(),
+
+                    // State Page (New)
+                    _buildStatePage(),
 
                     // Role Page
                     _buildRolePage(),
@@ -229,6 +293,86 @@ class _OnboardingPageState extends State<OnboardingPage> {
             icon: Icons.location_on_outlined,
             validator: (value) =>
                 value!.trim().isEmpty ? "Please enter your location" : null,
+          ),
+          const Spacer(),
+
+          // Next Button
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _nextPage,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                "Next",
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // State Selection Page (New)
+  Widget _buildStatePage() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Which State Are You In?",
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "This helps us provide market prices for your area",
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.black54,
+                ),
+          ),
+          const SizedBox(height: 32),
+
+          // State Dropdown
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.map, color: Colors.grey.shade600),
+              labelText: "Select State",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.blue.shade500, width: 2),
+              ),
+            ),
+            value: _selectedState,
+            items: _states.map((state) {
+              return DropdownMenuItem<String>(
+                value: state,
+                child: Text(state),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedState = value;
+              });
+            },
+            validator: (value) =>
+                value == null ? "Please select your state" : null,
           ),
           const Spacer(),
 

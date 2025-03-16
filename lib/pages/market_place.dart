@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:flutter/services.dart';
 import 'listing_details_page.dart';
 
 class MarketplacePage extends StatefulWidget {
@@ -18,6 +19,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   String? _selectedCategory = "All";
+  bool _isLoading = false;
 
   // Form controllers for adding/editing listings
   final _formKey = GlobalKey<FormState>();
@@ -66,10 +68,19 @@ class _MarketplacePageState extends State<MarketplacePage> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error picking image: $e")),
-      );
+      _showSnackBar("Error picking image: $e");
     }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(10),
+      ),
+    );
   }
 
   Future<String?> _uploadImageToCloudinary(XFile image) async {
@@ -86,9 +97,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
       );
       return response.secureUrl;
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error uploading image: $e")),
-      );
+      _showSnackBar("Error uploading image: $e");
       return null;
     } finally {
       setState(() {
@@ -98,21 +107,30 @@ class _MarketplacePageState extends State<MarketplacePage> {
   }
 
   void _showListingForm({String? listingId}) async {
+    setState(() {
+      _isLoading = true;
+    });
+
     if (listingId != null) {
-      final doc = await _firestore.collection('listings').doc(listingId).get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        _titleController.text = data['title'] ?? '';
-        _descriptionController.text = data['description'] ?? '';
-        _priceController.text = data['price'] ?? '';
-        _quantityController.text = data['quantity'] ?? '';
-        _locationController.text = data['location'] ?? '';
-        _phoneController.text = data['phoneNumber'] ?? '';
-        _category = data['category'] ?? 'Grains';
-        _isSold = data['isSold'] ?? false;
-        _imageUrl = data['imageUrl'];
-        _listingId = listingId;
-        _selectedImage = null;
+      try {
+        final doc =
+            await _firestore.collection('listings').doc(listingId).get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          _titleController.text = data['title'] ?? '';
+          _descriptionController.text = data['description'] ?? '';
+          _priceController.text = data['price'] ?? '';
+          _quantityController.text = data['quantity'] ?? '';
+          _locationController.text = data['location'] ?? '';
+          _phoneController.text = data['phoneNumber'] ?? '';
+          _category = data['category'] ?? 'Grains';
+          _isSold = data['isSold'] ?? false;
+          _imageUrl = data['imageUrl'];
+          _listingId = listingId;
+          _selectedImage = null;
+        }
+      } catch (e) {
+        _showSnackBar("Error loading listing: $e");
       }
     } else {
       _titleController.clear();
@@ -128,389 +146,748 @@ class _MarketplacePageState extends State<MarketplacePage> {
       _selectedImage = null;
     }
 
-    showDialog(
+    setState(() {
+      _isLoading = false;
+    });
+
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(_listingId == null ? "Add Listing" : "Edit Listing"),
-        content: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    height: 100,
-                    width: double.infinity,
-                    color: Colors.grey[200],
-                    child: _selectedImage != null
-                        ? Image.network(
-                            _selectedImage!.path,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.error),
-                          )
-                        : _imageUrl != null
-                            ? CachedNetworkImage(
-                                imageUrl: _imageUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator()),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(Icons.error),
-                              )
-                            : const Center(
-                                child: Text("Tap to select an image")),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (_isUploading)
-                  const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(labelText: "Title"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter a title" : null,
-                ),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(labelText: "Description"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter a description" : null,
-                ),
-                TextFormField(
-                  controller: _priceController,
-                  decoration:
-                      const InputDecoration(labelText: "Price (e.g., ₹45/kg)"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter a price" : null,
-                ),
-                TextFormField(
-                  controller: _quantityController,
-                  decoration: const InputDecoration(
-                      labelText: "Quantity (e.g., 1500 kg)"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter a quantity" : null,
-                ),
-                TextFormField(
-                  controller: _locationController,
-                  decoration: const InputDecoration(labelText: "Location"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter a location" : null,
-                ),
-                TextFormField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(labelText: "Phone Number"),
-                  validator: (value) =>
-                      value!.isEmpty ? "Please enter a phone number" : null,
-                ),
-                DropdownButtonFormField<String>(
-                  value: _category,
-                  decoration: const InputDecoration(labelText: "Category"),
-                  items: ["Grains", "Vegetables", "Fruits", "Pulses"]
-                      .map((category) => DropdownMenuItem(
-                            value: category,
-                            child: Text(category),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _category = value!;
-                    });
-                  },
-                  validator: (value) =>
-                      value == null ? "Please select a category" : null,
-                ),
-                SwitchListTile(
-                  title: const Text("Sold"),
-                  value: _isSold,
-                  onChanged: (value) {
-                    setState(() {
-                      _isSold = value;
-                    });
-                  },
-                ),
-              ],
-            ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(25),
+            topRight: Radius.circular(25),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (_formKey.currentState!.validate()) {
-                String? newImageUrl = _imageUrl;
-                if (_selectedImage != null) {
-                  newImageUrl = await _uploadImageToCloudinary(_selectedImage!);
-                  if (newImageUrl == null) return;
-                }
-
-                final userId = _auth.currentUser!.uid;
-                final data = {
-                  'title': _titleController.text.trim(),
-                  'description': _descriptionController.text.trim(),
-                  'price': _priceController.text.trim(),
-                  'quantity': _quantityController.text.trim(),
-                  'isSold': _isSold,
-                  'category': _category,
-                  'userId': userId,
-                  'location': _locationController.text.trim(),
-                  'phoneNumber': _phoneController.text.trim(),
-                  'createdAt': FieldValue.serverTimestamp(),
-                  if (newImageUrl != null) 'imageUrl': newImageUrl,
-                };
-
-                if (_listingId == null) {
-                  await _firestore.collection('listings').add(data);
-                } else {
-                  await _firestore
-                      .collection('listings')
-                      .doc(_listingId)
-                      .update(data);
-                }
-                Navigator.pop(context);
-                setState(() {});
-              }
-            },
-            child: Text(_listingId == null ? "Add" : "Save"),
-          ),
-        ],
+        child: Column(
+          children: [
+            Container(
+              width: 50,
+              height: 5,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _listingId == null ? "Add New Listing" : "Update Listing",
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          height: 150,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(15),
+                            border:
+                                Border.all(color: Colors.grey[300]!, width: 1),
+                          ),
+                          child: _selectedImage != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(15),
+                                  child: Image.network(
+                                    _selectedImage!.path,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Icon(Icons.error, size: 40),
+                                  ),
+                                )
+                              : _imageUrl != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(15),
+                                      child: CachedNetworkImage(
+                                        imageUrl: _imageUrl!,
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => Center(
+                                          child: CircularProgressIndicator(
+                                            color: Colors.green[700],
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) =>
+                                            const Icon(Icons.error, size: 40),
+                                      ),
+                                    )
+                                  : Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.add_photo_alternate_outlined,
+                                          size: 40,
+                                          color: Colors.green[600],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          "Add Product Image",
+                                          style: TextStyle(
+                                            color: Colors.green[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                        ),
+                      ),
+                      if (_isUploading)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: LinearProgressIndicator(
+                            backgroundColor: Colors.green[50],
+                            color: Colors.green[600],
+                          ),
+                        ),
+                      const SizedBox(height: 20),
+                      _buildTextField(
+                        controller: _titleController,
+                        label: "Title",
+                        hint: "Enter product name",
+                        icon: Icons.title,
+                      ),
+                      _buildTextField(
+                        controller: _descriptionController,
+                        label: "Description",
+                        hint: "Enter product description",
+                        icon: Icons.description,
+                        maxLines: 3,
+                      ),
+                      _buildTextField(
+                        controller: _priceController,
+                        label: "Price",
+                        hint: "e.g., ₹45/kg",
+                        icon: Icons.currency_rupee,
+                      ),
+                      _buildTextField(
+                        controller: _quantityController,
+                        label: "Quantity",
+                        hint: "e.g., 1500 kg",
+                        icon: Icons.scale,
+                      ),
+                      _buildTextField(
+                        controller: _locationController,
+                        label: "Location",
+                        hint: "Enter your location",
+                        icon: Icons.location_on,
+                      ),
+                      _buildTextField(
+                        controller: _phoneController,
+                        label: "Phone Number",
+                        hint: "Enter your contact number",
+                        icon: Icons.phone,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 15),
+                      Text(
+                        "Category",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 15),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButtonFormField<String>(
+                            value: _category,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 15),
+                            ),
+                            icon: Icon(Icons.keyboard_arrow_down,
+                                color: Colors.green[700]),
+                            items: ["Grains", "Vegetables", "Fruits", "Pulses"]
+                                .map((category) => DropdownMenuItem(
+                                      value: category,
+                                      child: Text(category),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _category = value!;
+                              });
+                            },
+                            validator: (value) => value == null
+                                ? "Please select a category"
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: SwitchListTile(
+                          title: const Text(
+                            "Mark as Sold",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          value: _isSold,
+                          activeColor: Colors.green[600],
+                          onChanged: (value) {
+                            setState(() {
+                              _isSold = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          onPressed: _submitForm,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[600],
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _listingId == null ? "Add Listing" : "Save Changes",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Future<void> _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      Navigator.pop(context);
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        String? newImageUrl = _imageUrl;
+        if (_selectedImage != null) {
+          _showSnackBar("Uploading image...");
+          newImageUrl = await _uploadImageToCloudinary(_selectedImage!);
+          if (newImageUrl == null) {
+            setState(() {
+              _isLoading = false;
+            });
+            return;
+          }
+        }
+
+        final userId = _auth.currentUser!.uid;
+        final data = {
+          'title': _titleController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'price': _priceController.text.trim(),
+          'quantity': _quantityController.text.trim(),
+          'isSold': _isSold,
+          'category': _category,
+          'userId': userId,
+          'location': _locationController.text.trim(),
+          'phoneNumber': _phoneController.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+          if (newImageUrl != null) 'imageUrl': newImageUrl,
+        };
+
+        if (_listingId == null) {
+          await _firestore.collection('listings').add(data);
+          _showSnackBar("Listing added successfully!");
+        } else {
+          await _firestore.collection('listings').doc(_listingId).update(data);
+          _showSnackBar("Listing updated successfully!");
+        }
+      } catch (e) {
+        _showSnackBar("Error: $e");
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: TextFormField(
+            controller: controller,
+            maxLines: maxLines,
+            keyboardType: keyboardType,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              prefixIcon: Icon(icon, color: Colors.grey[600]),
+              border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+            ),
+            validator: (value) =>
+                value!.isEmpty ? "This field is required" : null,
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF9F9),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(25.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: TextFormField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: "Search crops...",
-                      prefixIcon: Icon(Icons.search, color: Colors.grey),
-                      border: InputBorder.none,
-                    ),
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                  ),
-                ),
-                const SizedBox(height: 25),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green[400]!, Colors.green[600]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Market Overview",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildMarketStat("Active Listings", "1,234"),
-                          _buildMarketStat("Today's Trades", "156"),
-                          _buildMarketStat("Price Change", "+2.3%"),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 25),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildCategoryChip("All", _selectedCategory == "All"),
-                      _buildCategoryChip(
-                          "Grains", _selectedCategory == "Grains"),
-                      _buildCategoryChip(
-                          "Vegetables", _selectedCategory == "Vegetables"),
-                      _buildCategoryChip(
-                          "Fruits", _selectedCategory == "Fruits"),
-                      _buildCategoryChip(
-                          "Pulses", _selectedCategory == "Pulses"),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 25),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text(
-                      "Top Listings",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      "View All",
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 15),
-                StreamBuilder<QuerySnapshot>(
-                  stream: _firestore
-                      .collection('listings')
-                      .orderBy('createdAt',
-                          descending: true) // Sort by createdAt, newest first
-                      .snapshots(), // Removed userId filter to show all listings
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return const Center(
-                          child: Text("Error loading listings"));
-                    }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(child: Text("No listings found"));
-                    }
-
-                    final listings = snapshot.data!.docs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final title =
-                          data['title']?.toString().toLowerCase() ?? '';
-                      final categoryMatch = _selectedCategory == "All" ||
-                          data['category'] == _selectedCategory;
-                      return title
-                              .contains(_searchController.text.toLowerCase()) &&
-                          categoryMatch;
-                    }).toList();
-
-                    return Column(
-                      children: listings.map((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        final isPositive =
-                            data['change']?.toString().contains("+") ?? true;
-                        return Column(
+      backgroundColor: const Color(0xFFF9FAFB),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 15, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildListingCard(
-                              data['title'] ?? "Unknown",
-                              data['description'] ?? "No description",
-                              data['price'] ?? "N/A",
-                              data['change'] ?? "+0.0%",
-                              data['quantity'] ?? "N/A",
-                              isPositive,
-                              doc.id,
-                              data['imageUrl'],
-                              data,
+                            const Text(
+                              "Marketplace",
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                            const SizedBox(height: 15),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.notifications_outlined),
+                                onPressed: () {},
+                              ),
+                            ),
                           ],
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
-                const SizedBox(height: 25),
-                const Text(
-                  "Market Trends",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          "Buy and sell farm produce directly",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: TextFormField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: "Search products...",
+                              hintStyle: TextStyle(color: Colors.grey[400]),
+                              prefixIcon:
+                                  Icon(Icons.search, color: Colors.grey[600]),
+                              suffixIcon: IconButton(
+                                icon: Icon(Icons.tune, color: Colors.grey[600]),
+                                onPressed: () {},
+                              ),
+                              border: InputBorder.none,
+                            ),
+                            onChanged: (value) {
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 15),
-                Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
+                    child: _buildMarketOverview(),
                   ),
-                  child: Column(
-                    children: [
-                      _buildTrendItem("Rice", "₹45", "+2.3%"),
-                      const Divider(),
-                      _buildTrendItem("Wheat", "₹32", "-1.5%"),
-                      const Divider(),
-                      _buildTrendItem("Corn", "₹28", "+2.8%"),
-                    ],
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 25, 0, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Categories",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildCategoryChip(
+                                  "All", _selectedCategory == "All"),
+                              _buildCategoryChip(
+                                  "Grains", _selectedCategory == "Grains"),
+                              _buildCategoryChip("Vegetables",
+                                  _selectedCategory == "Vegetables"),
+                              _buildCategoryChip(
+                                  "Fruits", _selectedCategory == "Fruits"),
+                              _buildCategoryChip(
+                                  "Pulses", _selectedCategory == "Pulses"),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Top Listings",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {},
+                          child: Row(
+                            children: [
+                              Text(
+                                "View All",
+                                style: TextStyle(
+                                  color: Colors.green[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: Colors.green[700],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                _buildListings(),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Market Trends",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        _buildMarketTrends(),
+                      ],
+                    ),
+                  ),
+                ),
+                // Add padding at the bottom for the FAB
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 100),
                 ),
               ],
             ),
           ),
-        ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showListingForm(),
-        backgroundColor: Colors.green,
-        label: const Text("List Your Crop"),
+        backgroundColor: Colors.green[700],
+        elevation: 2,
         icon: const Icon(Icons.add),
+        label: const Text(
+          "List Your Crop",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
 
-  Widget _buildMarketStat(String title, String value) {
+  Widget _buildMarketOverview() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('listings').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildMarketOverviewCard(
+            activeListings: "Loading...",
+            todaysTrades: "Loading...",
+            priceChange: "Loading...",
+          );
+        }
+
+        if (snapshot.hasError) {
+          return _buildMarketOverviewCard(
+            activeListings: "Error",
+            todaysTrades: "Error",
+            priceChange: "Error",
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return _buildMarketOverviewCard(
+            activeListings: "0",
+            todaysTrades: "0",
+            priceChange: "0%",
+          );
+        }
+
+        final listings = snapshot.data!.docs;
+        final activeListings = listings
+            .where((doc) =>
+                (doc.data() as Map<String, dynamic>)['isSold'] == false)
+            .length;
+
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final todaysTrades = listings.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final createdAt = data['createdAt'] as Timestamp?;
+          return createdAt != null && createdAt.toDate().isAfter(todayStart);
+        }).length;
+
+        // Placeholder for price change
+        final priceChange = "+2.3%";
+
+        return _buildMarketOverviewCard(
+          activeListings: activeListings.toString(),
+          todaysTrades: todaysTrades.toString(),
+          priceChange: priceChange,
+        );
+      },
+    );
+  }
+
+  Widget _buildMarketOverviewCard({
+    required String activeListings,
+    required String todaysTrades,
+    required String priceChange,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green[500]!, Colors.green[700]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.insert_chart_outlined,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Market Overview",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildMarketStat(
+                icon: Icons.local_offer_outlined,
+                title: "Active Listings",
+                value: activeListings,
+              ),
+              _buildMarketStat(
+                icon: Icons.swap_horiz,
+                title: "Today's Trades",
+                value: todaysTrades,
+              ),
+              _buildMarketStat(
+                icon: Icons.trending_up,
+                title: "Price Change",
+                value: priceChange,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMarketStat({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 18,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 4),
         Text(
           value,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -520,23 +897,150 @@ class _MarketplacePageState extends State<MarketplacePage> {
 
   Widget _buildCategoryChip(String label, bool isSelected) {
     return Container(
-      margin: const EdgeInsets.only(right: 10),
+      margin: const EdgeInsets.only(right: 12),
       child: FilterChip(
         selected: isSelected,
         showCheckmark: false,
-        label: Text(label),
-        labelStyle: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-          fontWeight: FontWeight.w500,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        label: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         backgroundColor: Colors.white,
-        selectedColor: Colors.green,
+        selectedColor: Colors.green[600],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: isSelected ? Colors.transparent : Colors.grey[300]!,
+          ),
+        ),
+        elevation: isSelected ? 2 : 0,
+        shadowColor:
+            isSelected ? Colors.green.withOpacity(0.3) : Colors.transparent,
         onSelected: (bool selected) {
           setState(() {
             _selectedCategory = selected ? label : null;
           });
         },
       ),
+    );
+  }
+
+  Widget _buildListings() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('listings')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(
+                  color: Colors.green,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Text(
+                  "Error loading listings",
+                  style: TextStyle(color: Colors.red[700]),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text("No listings found"),
+              ),
+            ),
+          );
+        }
+
+        final listings = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final title = data['title']?.toString().toLowerCase() ?? '';
+          final categoryMatch = _selectedCategory == "All" ||
+              data['category'] == _selectedCategory;
+          return title.contains(_searchController.text.toLowerCase()) &&
+              categoryMatch;
+        }).toList();
+
+        if (listings.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 50,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "No listings match your search",
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final doc = listings[index];
+                final data = doc.data() as Map<String, dynamic>;
+                final isPositive =
+                    data['change']?.toString().contains("+") ?? true;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 15),
+                  child: _buildListingCard(
+                    data['title'] ?? "Unknown",
+                    data['description'] ?? "No description",
+                    data['price'] ?? "N/A",
+                    data['change'] ?? "+0.0%",
+                    data['quantity'] ?? "N/A",
+                    isPositive,
+                    doc.id,
+                    data['imageUrl'],
+                    data,
+                  ),
+                );
+              },
+              childCount: listings.length,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -574,101 +1078,216 @@ class _MarketplacePageState extends State<MarketplacePage> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
-              offset: const Offset(0, 5),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(12),
+            // Image section
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
               ),
-              child: imageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) =>
-                          const Center(child: CircularProgressIndicator()),
-                      errorWidget: (context, url, error) =>
-                          const Icon(Icons.error),
-                    )
-                  : Icon(
-                      Icons.grass,
-                      size: 40,
-                      color: Colors.green[400],
-                    ),
+              child: SizedBox(
+                height: 150,
+                width: double.infinity,
+                child: imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[200],
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.green[600],
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.error),
+                        ),
+                      )
+                    : Container(
+                        color: Colors.grey[200],
+                        child: Icon(
+                          Icons.image,
+                          size: 50,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+              ),
             ),
-            const SizedBox(width: 15),
-            Expanded(
+            // Content section
+            Padding(
+              padding: const EdgeInsets.all(15),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Category & Change
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          data['category'] ?? 'N/A',
+                          style: TextStyle(
+                            color: Colors.green[700],
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 10,
+                          vertical: 5,
                         ),
                         decoration: BoxDecoration(
                           color: isPositive ? Colors.green[50] : Colors.red[50],
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          change,
-                          style: TextStyle(
-                            color: isPositive ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isPositive
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                              color: isPositive
+                                  ? Colors.green[700]
+                                  : Colors.red[700],
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              change,
+                              style: TextStyle(
+                                color: isPositive
+                                    ? Colors.green[700]
+                                    : Colors.red[700],
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  // Title
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 5),
+                  // Description
                   Text(
                     description,
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 14,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  // Price & Quantity
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         price,
-                        style: const TextStyle(
-                          color: Colors.green,
+                        style: TextStyle(
+                          color: Colors.green[700],
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            quantity,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Location & Contact
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
                       Text(
-                        quantity,
+                        data['location'] ?? 'N/A',
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 14,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.phone_outlined,
+                          size: 18,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.message_outlined,
+                          size: 18,
+                          color: Colors.green[700],
                         ),
                       ),
                     ],
@@ -682,51 +1301,106 @@ class _MarketplacePageState extends State<MarketplacePage> {
     );
   }
 
-  Widget _buildTrendItem(String crop, String price, String change) {
-    bool isPositive = change.contains("+");
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            crop,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Row(
-            children: [
-              Text(
-                price,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: isPositive ? Colors.green[50] : Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  change,
-                  style: TextStyle(
-                    color: isPositive ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+  Widget _buildMarketTrends() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
+      child: Column(
+        children: [
+          _buildTrendItem("Rice", "₹45", "+2.3%", true),
+          const Divider(height: 30),
+          _buildTrendItem("Wheat", "₹32", "-1.5%", false),
+          const Divider(height: 30),
+          _buildTrendItem("Corn", "₹28", "+2.8%", true),
+          const Divider(height: 30),
+          _buildTrendItem("Soybeans", "₹52", "+1.2%", true),
+          const Divider(height: 30),
+          _buildTrendItem("Potatoes", "₹23", "-0.8%", false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrendItem(
+      String crop, String price, String change, bool isPositive) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.grass,
+                color: Colors.green[700],
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              crop,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Text(
+              price,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 5,
+              ),
+              decoration: BoxDecoration(
+                color: isPositive ? Colors.green[50] : Colors.red[50],
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                    color: isPositive ? Colors.green[700] : Colors.red[700],
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    change,
+                    style: TextStyle(
+                      color: isPositive ? Colors.green[700] : Colors.red[700],
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

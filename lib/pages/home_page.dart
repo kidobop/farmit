@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:farmit/pages/market_place.dart'; // Import MarketplacePage
-import 'package:farmit/pages/profile.dart'; // Import ProfilePage
-import 'package:farmit/pages/tools_page.dart'; // Import ToolsPage
+import 'package:farmit/pages/market_place.dart';
+import 'package:farmit/pages/profile.dart';
+import 'package:farmit/pages/tools_page.dart';
+import 'package:farmit/pages/market_prices_page.dart';
+import 'package:farmit/pages/weather_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomePage extends StatefulWidget {
-  final int initialIndex; // Add initialIndex to match main.dart routing
+  final int initialIndex;
   const HomePage({super.key, this.initialIndex = 0});
 
   @override
@@ -16,7 +19,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late int _selectedIndex;
 
-  // List of pages for each tab
   final List<Widget> _pages = [
     const HomeContent(),
     const MarketplacePage(),
@@ -24,25 +26,23 @@ class _HomePageState extends State<HomePage> {
     const ProfilePage(),
   ];
 
-  // Routes corresponding to each tab (for navigation)
   static const List<String> _routes = [
-    '/home', // HomeContent
-    '/market', // MarketplacePage
-    '/tools', // ToolsPage
-    '/profile', // ProfilePage
+    '/',
+    '/market',
+    '/tools',
+    '/profile',
   ];
 
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget.initialIndex; // Set initial index from route
+    _selectedIndex = widget.initialIndex;
   }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    // Navigate to the selected route if not already there
     if (ModalRoute.of(context)?.settings.name != _routes[index]) {
       Navigator.of(context).pushReplacementNamed(_routes[index]);
     }
@@ -51,10 +51,12 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex], // Display the selected page
+      body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        margin: const EdgeInsets.symmetric(
+            horizontal: 20, vertical: 10), // Reduced vertical margin
         decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -67,28 +69,22 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(30),
           child: BottomNavigationBar(
             backgroundColor: Colors.white,
-            selectedItemColor: Colors.green,
-            unselectedItemColor: Colors.grey,
+            selectedItemColor: Colors.teal.shade700,
+            unselectedItemColor: Colors.grey.shade500,
             currentIndex: _selectedIndex,
             type: BottomNavigationBarType.fixed,
             onTap: _onItemTapped,
+            showUnselectedLabels: true,
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
             items: const [
               BottomNavigationBarItem(
-                icon: Icon(Icons.home_rounded),
-                label: 'Home',
-              ),
+                  icon: Icon(Icons.home_rounded), label: 'Home'),
               BottomNavigationBarItem(
-                icon: Icon(Icons.shopping_bag_rounded),
-                label: 'Market',
-              ),
+                  icon: Icon(Icons.shopping_bag_rounded), label: 'Market'),
               BottomNavigationBarItem(
-                icon: Icon(Icons.agriculture_rounded),
-                label: 'Tools',
-              ),
+                  icon: Icon(Icons.agriculture_rounded), label: 'Tools'),
               BottomNavigationBarItem(
-                icon: Icon(Icons.person_rounded),
-                label: 'Profile',
-              ),
+                  icon: Icon(Icons.person_rounded), label: 'Profile'),
             ],
           ),
         ),
@@ -97,8 +93,59 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
+
+  @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  String? _userName;
+  Map<String, dynamic>? _weatherData;
+  bool _isLoadingWeather = true;
+  String? _weatherError;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserDataAndWeather();
+  }
+
+  Future<void> _fetchUserDataAndWeather() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (!userDoc.exists) return;
+
+      final data = userDoc.data() as Map<String, dynamic>;
+      final state = data['state'];
+      final name = data['name'] ?? "User";
+
+      if (state == null) return;
+
+      setState(() {
+        _userName = name;
+      });
+
+      final weatherService = WeatherService();
+      final weather = await weatherService.fetchWeather(state);
+      setState(() {
+        _weatherData = weather;
+        _isLoadingWeather = false;
+      });
+    } catch (e) {
+      setState(() {
+        _weatherError = "Failed to load weather: $e";
+        _isLoadingWeather = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,280 +154,311 @@ class HomeContent extends StatelessWidget {
       return const Scaffold(body: Center(child: Text("Not logged in")));
     }
 
-    return FutureBuilder<DocumentSnapshot>(
-      future:
-          FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
-        }
-        if (snapshot.hasError) {
-          return const Scaffold(
-              body: Center(child: Text("Error loading user data")));
-        }
-        if (!snapshot.hasData || !snapshot.data!.exists) {
-          return const Scaffold(
-              body: Center(child: Text("User data not found")));
-        }
-
-        final data = snapshot.data!.data() as Map<String, dynamic>;
-        final name =
-            data['name'] ?? "User"; // Fallback to "User" if name is missing
-
-        return Scaffold(
-          backgroundColor: const Color(0xFFFBF9F9),
-          body: SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(25.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Hi, $name!",
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Text(
-                              "21 Jan 2025",
-                              style: TextStyle(color: Colors.green),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.all(12),
-                          child: const Icon(
-                            Icons.notifications,
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 25),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.blue[400]!, Colors.blue[600]!],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.teal.shade100, Colors.white],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0), // Reduced padding slightly
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                "Today's Weather",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                "28°C",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                "Partly Cloudy",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            "Hi, ${_userName ?? 'User'}!",
+                            style: TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal.shade900,
+                            ),
                           ),
-                          const Icon(
-                            Icons.cloud,
-                            color: Colors.white,
-                            size: 64,
+                          Text(
+                            "March 16, 2025",
+                            style: TextStyle(
+                                color: Colors.teal.shade600, fontSize: 16),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 25),
-                    const Text(
-                      "Quick Actions",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                      CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.teal.shade700,
+                        child: Icon(Icons.notifications,
+                            color: Colors.white, size: 28),
                       ),
-                    ),
-                    const SizedBox(height: 15),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildQuickActionCard(
-                          "Scan Plant",
-                          Icons.camera_alt,
-                          Colors.green[100]!,
-                          Colors.green,
-                        ),
-                        _buildQuickActionCard(
-                          "Market Price",
-                          Icons.trending_up,
-                          Colors.orange[100]!,
-                          Colors.orange,
-                        ),
-                        _buildQuickActionCard(
-                          "My Crops",
-                          Icons.grass,
-                          Colors.blue[100]!,
-                          Colors.blue,
+                    ],
+                  ),
+                  const SizedBox(height: 20), // Reduced spacing
+                  // Weather Card
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue.shade600, Colors.blue.shade900],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 25),
-                    const Text(
-                      "Today's Market Prices",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    child: _isLoadingWeather
+                        ? const Center(
+                            child:
+                                CircularProgressIndicator(color: Colors.white))
+                        : _weatherError != null
+                            ? Center(
+                                child: Text(_weatherError!,
+                                    style:
+                                        const TextStyle(color: Colors.white)))
+                            : Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "Today's Weather",
+                                        style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 16),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        "${_weatherData!['temperature']}°C",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        _weatherData!['description']
+                                            .toString()
+                                            .capitalize(),
+                                        style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 16),
+                                      ),
+                                    ],
+                                  ),
+                                  CachedNetworkImage(
+                                    imageUrl: WeatherService.getWeatherIconUrl(
+                                        _weatherData!['icon']),
+                                    width: 70,
+                                    height: 70,
+                                    placeholder: (context, url) =>
+                                        const CircularProgressIndicator(),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(
+                                      Icons.cloud,
+                                      color: Colors.white,
+                                      size: 70,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                  ),
+                  const SizedBox(height: 20), // Reduced spacing
+                  // Quick Actions (Adjusted height)
+                  const Text(
+                    "Quick Actions",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10), // Reduced spacing
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildQuickActionCard(
+                        "Scan Plant",
+                        Icons.camera_alt,
+                        Colors.green,
+                        () => ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Feature coming soon!')),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 15),
-                    _buildMarketPriceCard("Rice", "₹3,500/quintal", "+2.3%"),
-                    const SizedBox(height: 10),
-                    _buildMarketPriceCard("Wheat", "₹2,800/quintal", "-1.2%"),
-                    const SizedBox(height: 10),
-                    _buildMarketPriceCard("Cotton", "₹6,200/quintal", "+3.1%"),
-                    const SizedBox(height: 25),
-                    const Text(
-                      "Farming Tips",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                      _buildQuickActionCard(
+                        "Market Price",
+                        Icons.trending_up,
+                        Colors.orange,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const MarketPricesPage()),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 15),
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                      _buildQuickActionCard(
+                        "My Crops",
+                        Icons.grass,
+                        Colors.blue,
+                        () => ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Feature coming soon!')),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20), // Reduced spacing
+                  // Market Prices
+                  const Text("Today's Market Prices",
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10), // Reduced spacing
+                  _buildMarketPriceCard("Rice", "₹3,500/quintal", "+2.3%"),
+                  const SizedBox(height: 8), // Reduced spacing
+                  _buildMarketPriceCard("Wheat", "₹2,800/quintal", "-1.2%"),
+                  const SizedBox(height: 8), // Reduced spacing
+                  _buildMarketPriceCard("Cotton", "₹6,200/quintal", "+3.1%"),
+                  const SizedBox(height: 20), // Reduced spacing
+                  // Farming Tips
+                  const Text("Farming Tips",
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10), // Reduced spacing
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
                             blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          _buildTipCard(
-                            "Best time to sow wheat is approaching",
-                            "2 hours ago",
-                          ),
-                          const Divider(),
-                          _buildTipCard(
-                            "Protect your crops from upcoming rain",
-                            "5 hours ago",
-                          ),
-                        ],
-                      ),
+                            offset: const Offset(0, 5)),
+                      ],
                     ),
-                  ],
-                ),
+                    child: Column(
+                      children: [
+                        _buildTipCard("Best time to sow wheat is approaching",
+                            "2 hours ago"),
+                        const Divider(),
+                        _buildTipCard("Protect your crops from upcoming rain",
+                            "5 hours ago"),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
+  // Updated Quick Action Card with reduced height
   Widget _buildQuickActionCard(
-      String title, IconData icon, Color bgColor, Color iconColor) {
-    return Container(
-      width: 100,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: iconColor, size: 30),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+      String title, IconData icon, Color color, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 110, // Fixed width
+        height: 90, // Reduced height to prevent overflow
+        padding: const EdgeInsets.all(12), // Reduced padding
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-        ],
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 30), // Slightly reduced icon size
+            const SizedBox(height: 6), // Reduced spacing
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13, // Slightly reduced font size
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildMarketPriceCard(String crop, String price, String change) {
     bool isPositive = change.contains("+");
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5))
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            crop,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          Text(crop,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal)),
           Row(
             children: [
-              Text(
-                price,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              Text(price,
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800)),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isPositive
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                change,
-                style: TextStyle(
-                  color: isPositive ? Colors.green : Colors.red,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                child: Text(
+                  change,
+                  style: TextStyle(
+                    color: isPositive ? Colors.green : Colors.red,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -396,34 +474,23 @@ class HomeContent extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green[100],
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.lightbulb, color: Colors.green[700], size: 20),
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.teal.shade100,
+            child: Icon(Icons.lightbulb, color: Colors.teal.shade700, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  tip,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Text(tip,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                Text(time,
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               ],
             ),
           ),
@@ -431,4 +498,9 @@ class HomeContent extends StatelessWidget {
       ),
     );
   }
+}
+
+extension StringExtension on String {
+  String capitalize() =>
+      isEmpty ? this : "${this[0].toUpperCase()}${substring(1)}";
 }
